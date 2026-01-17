@@ -8,10 +8,13 @@ from typing import Any
 from intelephense_watcher.config.constants import COLORS, CONSTANTS
 from intelephense_watcher.utils import uri_to_path
 
-# Pattern to match unused underscore-prefixed variable hints
-# e.g., "Symbol '$_response' is declared but not used."
-# Uses * (not +) to also match just "$_" with no additional characters
-UNUSED_UNDERSCORE_VAR_PATTERN = re.compile(r"^Symbol '\$_[^']*' is declared but not used\.$")
+# Pattern to match unused underscore-prefixed symbol hints
+# e.g., "Symbol '$_response' is declared but not used." (variable)
+# e.g., "Symbol '_createFriendship' is declared but not used." (method/function)
+# The \$? makes the dollar sign optional to match both variables and methods
+UNUSED_UNDERSCORE_SYMBOL_PATTERN = re.compile(
+    r"^Symbol '\$?_[^']*' is declared but not used\.$"
+)
 
 # Pattern to match unused underscore-prefixed function/method hints
 # e.g., "Method '_createFriendship' is declared but never used."
@@ -19,6 +22,9 @@ UNUSED_UNDERSCORE_VAR_PATTERN = re.compile(r"^Symbol '\$_[^']*' is declared but 
 UNUSED_UNDERSCORE_FUNC_PATTERN = re.compile(
     r"^(?:Method|Function) '_[^']*' is declared but never used\.$"
 )
+
+# Keep old name as alias for backward compatibility
+UNUSED_UNDERSCORE_VAR_PATTERN = UNUSED_UNDERSCORE_SYMBOL_PATTERN
 
 
 def filter_diagnostics_by_severity(
@@ -46,6 +52,7 @@ def _is_unused_underscore_symbol(diagnostic: dict[str, Any]) -> bool:
 
     This matches:
     - Variables: "Symbol '$_response' is declared but not used."
+    - Methods as Symbol: "Symbol '_createFriendship' is declared but not used."
     - Methods: "Method '_createFriendship' is declared but never used."
     - Functions: "Function '_myHelper' is declared but never used."
 
@@ -60,7 +67,7 @@ def _is_unused_underscore_symbol(diagnostic: dict[str, Any]) -> bool:
         return False
     message = diagnostic.get("message", "")
     return bool(
-        UNUSED_UNDERSCORE_VAR_PATTERN.match(message)
+        UNUSED_UNDERSCORE_SYMBOL_PATTERN.match(message)
         or UNUSED_UNDERSCORE_FUNC_PATTERN.match(message)
     )
 

@@ -193,6 +193,22 @@ class TestIsUnusedUnderscoreVariable:
         assert _is_unused_underscore_variable(diagnostic) is False
 
     # Tests for underscore-prefixed methods
+    def test_matches_underscore_symbol_without_dollar(self) -> None:
+        """Test matching Symbol without dollar sign (methods reported as Symbol)."""
+        diagnostic = {
+            "severity": CONSTANTS.SEVERITY_HINT,
+            "message": "Symbol '_createFriendship' is declared but not used.",
+        }
+        assert _is_unused_underscore_variable(diagnostic) is True
+
+    def test_matches_underscore_symbol_without_dollar_2(self) -> None:
+        """Test matching another Symbol without dollar sign."""
+        diagnostic = {
+            "severity": CONSTANTS.SEVERITY_HINT,
+            "message": "Symbol '_createIgnoredUser' is declared but not used.",
+        }
+        assert _is_unused_underscore_variable(diagnostic) is True
+
     def test_matches_underscore_method_hint(self) -> None:
         """Test matching of unused underscore method hints."""
         diagnostic = {
