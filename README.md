@@ -154,6 +154,38 @@ Update dependencies:
 update.bat
 ```
 
+## Configuration
+
+### Ignoring Files and Folders
+
+Create an `intelephense.json` file in your project root to ignore specific files or folders from diagnostics:
+
+```json
+{
+  "ignore": [
+    "vendor/**",
+    "tests/fixtures/**",
+    "*.generated.php"
+  ]
+}
+```
+
+See [HOW_TO_IGNORE_FILES_AND_FOLDERS.md](HOW_TO_IGNORE_FILES_AND_FOLDERS.md) for detailed documentation.
+
+### Underscore-Prefixed Symbols
+
+By default, unused symbols prefixed with underscore are automatically ignored:
+
+- Variables: `$_unused`, `$_response`
+- Methods: `_privateHelper()`, `_createTestData()`
+- Functions: `_helperFunc()`
+
+This convention indicates "intentionally unused" symbols. Use `--no-ignore-unused-underscore` to show them:
+
+```batch
+start.bat . --no-ignore-unused-underscore
+```
+
 ## Environment Variables
 
 - `DEBUG` - Set to `1` or `true` for debug mode
