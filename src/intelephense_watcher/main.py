@@ -8,6 +8,7 @@ import time
 
 from watchdog.observers import Observer
 
+from intelephense_watcher.config.config_file import get_ignore_patterns, load_config_file
 from intelephense_watcher.config.constants import COLORS, CONSTANTS
 from intelephense_watcher.config.settings import Settings
 from intelephense_watcher.diagnostics import DiagnosticsDisplay
@@ -126,6 +127,11 @@ def parse_args() -> argparse.Namespace:
         metavar="QUERY",
         help="Search for symbols matching QUERY and exit",
     )
+    parser.add_argument(
+        "--no-ignore-unused-underscore",
+        action="store_true",
+        help="Show 'unused variable' hints for underscore-prefixed variables (default: hidden)",
+    )
     return parser.parse_args()
 
 
@@ -138,12 +144,18 @@ def main() -> None:
         print(f"Error: '{folder_path}' is not a valid directory")
         sys.exit(1)
 
+    # Load config file
+    config = load_config_file(folder_path)
+    ignore_patterns = get_ignore_patterns(config)
+
     # Create settings from CLI args
     settings = Settings(
         workspace_path=folder_path,
         min_severity=CONSTANTS.SEVERITY_NAMES[args.min_severity],
         timeout=args.timeout,
         output_file=args.output,
+        ignore_unused_underscore=not args.no_ignore_unused_underscore,
+        ignore_patterns=ignore_patterns,
     )
 
     print(f"{COLORS.CYAN}Starting Intelephense LSP Watcher...{COLORS.RESET}")
@@ -151,7 +163,12 @@ def main() -> None:
 
     # Initialize components
     lsp_client = LspClient(settings.workspace_path, request_timeout=settings.request_timeout)
-    display = DiagnosticsDisplay(settings.workspace_path, min_severity=settings.min_severity)
+    display = DiagnosticsDisplay(
+        settings.workspace_path,
+        min_severity=settings.min_severity,
+        ignore_unused_underscore=settings.ignore_unused_underscore,
+        ignore_patterns=settings.ignore_patterns,
+    )
 
     # Start LSP server
     print("Starting Intelephense...")

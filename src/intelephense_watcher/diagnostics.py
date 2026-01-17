@@ -1,10 +1,24 @@
 """Diagnostics display for terminal output."""
 
+import fnmatch
 import os
+import re
 from typing import Any
 
 from intelephense_watcher.config.constants import COLORS, CONSTANTS
 from intelephense_watcher.utils import uri_to_path
+
+# Pattern to match unused underscore-prefixed variable hints
+# e.g., "Symbol '$_response' is declared but not used."
+# Uses * (not +) to also match just "$_" with no additional characters
+UNUSED_UNDERSCORE_VAR_PATTERN = re.compile(r"^Symbol '\$_[^']*' is declared but not used\.$")
+
+# Pattern to match unused underscore-prefixed function/method hints
+# e.g., "Method '_createFriendship' is declared but never used."
+# e.g., "Function '_myHelper' is declared but never used."
+UNUSED_UNDERSCORE_FUNC_PATTERN = re.compile(
+    r"^(?:Method|Function) '_[^']*' is declared but never used\.$"
+)
 
 
 def filter_diagnostics_by_severity(
@@ -27,6 +41,97 @@ def filter_diagnostics_by_severity(
     return filtered
 
 
+def _is_unused_underscore_symbol(diagnostic: dict[str, Any]) -> bool:
+    """Check if diagnostic is an unused underscore-prefixed symbol hint.
+
+    This matches:
+    - Variables: "Symbol '$_response' is declared but not used."
+    - Methods: "Method '_createFriendship' is declared but never used."
+    - Functions: "Function '_myHelper' is declared but never used."
+
+    Args:
+        diagnostic: A diagnostic object from the LSP.
+
+    Returns:
+        True if this is an unused hint for an underscore-prefixed symbol.
+    """
+    # Only apply to hints (severity 4)
+    if diagnostic.get("severity", 1) != CONSTANTS.SEVERITY_HINT:
+        return False
+    message = diagnostic.get("message", "")
+    return bool(
+        UNUSED_UNDERSCORE_VAR_PATTERN.match(message)
+        or UNUSED_UNDERSCORE_FUNC_PATTERN.match(message)
+    )
+
+
+# Keep the old function name as an alias for backward compatibility
+_is_unused_underscore_variable = _is_unused_underscore_symbol
+
+
+def filter_unused_underscore_variables(
+    diagnostics: dict[str, list[dict[str, Any]]],
+    enabled: bool = True,
+) -> dict[str, list[dict[str, Any]]]:
+    """Filter out unused hints for underscore-prefixed symbols.
+
+    This filters hints for intentionally unused symbols:
+    - Variables: "Symbol '$_response' is declared but not used."
+    - Methods: "Method '_createFriendship' is declared but never used."
+    - Functions: "Function '_myHelper' is declared but never used."
+
+    The underscore prefix indicates the symbol is intentionally unused.
+
+    Args:
+        diagnostics: Dictionary mapping URIs to lists of diagnostic objects.
+        enabled: Whether filtering is enabled (False = return unchanged).
+
+    Returns:
+        Filtered diagnostics dictionary.
+    """
+    if not enabled:
+        return diagnostics
+
+    filtered: dict[str, list[dict[str, Any]]] = {}
+    for uri, diags in diagnostics.items():
+        filtered_diags = [d for d in diags if not _is_unused_underscore_symbol(d)]
+        if filtered_diags:
+            filtered[uri] = filtered_diags
+    return filtered
+
+
+def filter_by_ignore_patterns(
+    diagnostics: dict[str, list[dict[str, Any]]],
+    ignore_patterns: list[str],
+    workspace_path: str,
+) -> dict[str, list[dict[str, Any]]]:
+    """Filter out diagnostics from paths matching ignore patterns.
+
+    Args:
+        diagnostics: Dictionary mapping URIs to lists of diagnostic objects.
+        ignore_patterns: List of glob patterns to ignore (e.g., "vendor/**").
+        workspace_path: Absolute path to the workspace root.
+
+    Returns:
+        Filtered diagnostics dictionary with ignored paths removed.
+    """
+    if not ignore_patterns:
+        return diagnostics
+
+    filtered: dict[str, list[dict[str, Any]]] = {}
+    for uri, diags in diagnostics.items():
+        file_path = uri_to_path(uri)
+        rel_path = os.path.relpath(file_path, workspace_path)
+        # Normalize to forward slashes for pattern matching
+        rel_path = rel_path.replace("\\", "/")
+
+        # Check if path matches any ignore pattern
+        if not any(fnmatch.fnmatch(rel_path, p) for p in ignore_patterns):
+            filtered[uri] = diags
+
+    return filtered
+
+
 class DiagnosticsDisplay:
     """Handles pretty-printing of diagnostics."""
 
@@ -37,9 +142,17 @@ class DiagnosticsDisplay:
         CONSTANTS.SEVERITY_HINT: ("Hint", COLORS.CYAN),
     }
 
-    def __init__(self, workspace_path: str, min_severity: int = 4):
+    def __init__(
+        self,
+        workspace_path: str,
+        min_severity: int = 4,
+        ignore_unused_underscore: bool = True,
+        ignore_patterns: list[str] | None = None,
+    ):
         self.workspace_path = os.path.abspath(workspace_path)
         self.min_severity = min_severity
+        self.ignore_unused_underscore = ignore_unused_underscore
+        self.ignore_patterns = ignore_patterns or []
 
     def display(self, diagnostics: dict[str, list[dict[str, Any]]]) -> None:
         """Display all diagnostics filtered by minimum severity."""
@@ -57,8 +170,14 @@ class DiagnosticsDisplay:
         print(f"Filter: {filter_name} and above")
         print("-" * 60)
 
-        # Filter diagnostics by severity
+        # Apply filters
         filtered_diagnostics = filter_diagnostics_by_severity(diagnostics, self.min_severity)
+        filtered_diagnostics = filter_by_ignore_patterns(
+            filtered_diagnostics, self.ignore_patterns, self.workspace_path
+        )
+        filtered_diagnostics = filter_unused_underscore_variables(
+            filtered_diagnostics, self.ignore_unused_underscore
+        )
 
         if not filtered_diagnostics:
             print(f"{COLORS.GREEN}No issues found!{COLORS.RESET}")
@@ -135,8 +254,14 @@ class DiagnosticsDisplay:
         lines.append(f"Filter: {filter_name} and above")
         lines.append("-" * 60)
 
-        # Filter diagnostics by severity
+        # Apply filters
         filtered_diagnostics = filter_diagnostics_by_severity(diagnostics, self.min_severity)
+        filtered_diagnostics = filter_by_ignore_patterns(
+            filtered_diagnostics, self.ignore_patterns, self.workspace_path
+        )
+        filtered_diagnostics = filter_unused_underscore_variables(
+            filtered_diagnostics, self.ignore_unused_underscore
+        )
 
         if not filtered_diagnostics:
             lines.append("No issues found!")

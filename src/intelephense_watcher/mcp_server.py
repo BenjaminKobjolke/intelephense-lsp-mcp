@@ -111,17 +111,36 @@ def _severity_to_number(severity_name: str) -> int:
 
 
 def _format_diagnostics(
-    diagnostics: dict[str, list[dict[str, Any]]], min_severity: int
+    diagnostics: dict[str, list[dict[str, Any]]],
+    min_severity: int,
+    ignore_unused_underscore: bool = True,
+    ignore_patterns: list[str] | None = None,
+    workspace_path: str = "",
 ) -> str:
     """Format diagnostics as a readable string.
 
     Args:
         diagnostics: Dictionary of URI -> list of diagnostic objects.
         min_severity: Minimum severity level to include (1=error, 4=hint).
+        ignore_unused_underscore: Filter out unused $_xxx variable hints.
+        ignore_patterns: List of glob patterns to ignore.
+        workspace_path: Absolute path to workspace root.
 
     Returns:
         Formatted string of diagnostics.
     """
+    from intelephense_watcher.diagnostics import (
+        filter_by_ignore_patterns,
+        filter_unused_underscore_variables,
+    )
+
+    # Apply ignore patterns filter
+    if ignore_patterns and workspace_path:
+        diagnostics = filter_by_ignore_patterns(diagnostics, ignore_patterns, workspace_path)
+
+    # Apply underscore filter
+    diagnostics = filter_unused_underscore_variables(diagnostics, ignore_unused_underscore)
+
     lines: list[str] = []
 
     for uri, diags in sorted(diagnostics.items()):
@@ -157,7 +176,10 @@ def _format_diagnostics(
 
 @mcp.tool()
 def get_diagnostics(
-    project_path: str, file_path: str | None = None, min_severity: str = "hint"
+    project_path: str,
+    file_path: str | None = None,
+    min_severity: str = "hint",
+    ignore_unused_underscore: bool = True,
 ) -> str:
     """Get PHP diagnostics for a project or specific file.
 
@@ -165,15 +187,22 @@ def get_diagnostics(
         project_path: Absolute path to the PHP project root.
         file_path: Optional specific file to check (returns all if omitted).
         min_severity: Minimum severity level (error, warning, info, hint).
+        ignore_unused_underscore: Filter out unused $_xxx variable hints (default: True).
 
     Returns:
         Formatted string of diagnostics.
     """
+    from intelephense_watcher.config.config_file import get_ignore_patterns, load_config_file
+
     logger.info(
         f"TOOL CALL: get_diagnostics(project_path={project_path!r}, "
         f"file_path={file_path!r}, min_severity={min_severity!r})"
     )
     try:
+        # Load config for this project
+        config = load_config_file(project_path)
+        ignore_patterns = get_ignore_patterns(config)
+
         client = get_lsp_client(project_path)
         severity_num = _severity_to_number(min_severity)
 
@@ -208,7 +237,9 @@ def get_diagnostics(
             else:
                 filtered = dict(client.diagnostics)
 
-        return _format_diagnostics(filtered, severity_num)
+        return _format_diagnostics(
+            filtered, severity_num, ignore_unused_underscore, ignore_patterns, project_path
+        )
 
     except Exception as e:
         logger.exception("Error getting diagnostics")

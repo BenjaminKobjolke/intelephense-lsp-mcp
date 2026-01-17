@@ -12,6 +12,8 @@ class Settings:
     min_severity: int = 4  # Default: show all (hint and above)
     timeout: int | None = None  # None = watch forever, int = seconds
     output_file: str | None = None  # None = console, str = file path
+    ignore_unused_underscore: bool = True  # Filter $_xxx unused variable hints
+    ignore_patterns: list[str] = field(default_factory=list)  # Glob patterns to ignore
     debug: bool = field(default_factory=lambda: os.environ.get("DEBUG", "").lower() in ("1", "true"))
     request_timeout: float = field(
         default_factory=lambda: float(os.environ.get("LSP_TIMEOUT", "30"))
