@@ -55,13 +55,13 @@ This package includes an MCP (Model Context Protocol) server that allows Claude 
 ### Option 1: Direct registration (recommended)
 
 ```bash
-claude mcp add --transport stdio intelephense -- uv --directory D:\GIT\BenjaminKobjolke\intelephense-test\intelephense-watcher run python -m intelephense_watcher.mcp_server
+claude mcp add --transport stdio intelephense -- uv --directory D:\GIT\BenjaminKobjolke\intelephense-mpc-windows run python -m intelephense_watcher.mcp_server
 ```
 
 ### Option 2: Using the batch file (Windows)
 
 ```bash
-claude mcp add --transport stdio intelephense -- cmd /c D:\GIT\BenjaminKobjolke\intelephense-test\intelephense-watcher\mcp-server.bat
+claude mcp add --transport stdio intelephense -- cmd /c D:\GIT\BenjaminKobjolke\intelephense-mpc-windows\mcp-server.bat
 ```
 
 ## Verification
