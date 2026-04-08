@@ -1,7 +1,5 @@
 """Tests for file handler utilities."""
 
-import pytest
-
 from intelephense_watcher.file_handler import is_php_file
 
 

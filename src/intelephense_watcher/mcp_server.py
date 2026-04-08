@@ -11,7 +11,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
-
 from watchdog.observers import Observer
 
 from intelephense_watcher.config.constants import CONSTANTS
@@ -41,7 +40,7 @@ logger.addHandler(stderr_handler)
 
 # Global registry of LSP clients and file observers by project path
 _lsp_clients: dict[str, LspClient] = {}
-_file_observers: dict[str, Observer] = {}
+_file_observers: dict[str, Any] = {}
 _clients_lock = threading.Lock()
 
 
@@ -268,9 +267,14 @@ def get_diagnostics(
 
         # Refresh file(s) to get latest diagnostics
         if file_path:
-            # Refresh single file (opens it if not yet known to LSP)
-            logger.info(f"Refreshing file: {file_path}")
-            client.ensure_document_open(file_path)
+            # Force fresh diagnostics for single file by notifying workspace
+            # change, closing, and reopening to bypass any cached state
+            logger.info(f"Refreshing file (forced): {file_path}")
+            file_uri = path_to_uri(file_path)
+            client.notify_files_changed([{"uri": file_uri, "type": 2}])
+            if file_uri in client._opened_uris:
+                client.close_document(file_path)
+            client.open_document(file_path)
         else:
             # Refresh all PHP files in project
             logger.info("Refreshing all PHP files...")
@@ -447,7 +451,8 @@ def get_hover(
 
         # Handle MarkupContent
         if isinstance(contents, dict):
-            return contents.get("value", str(contents))
+            value = contents.get("value", contents)
+            return value if isinstance(value, str) else str(value)
 
         # Handle MarkedString or array of MarkedString
         if isinstance(contents, list):
@@ -480,7 +485,7 @@ def _symbol_kind_name(kind: int) -> str:
     return kinds.get(kind, f"Kind{kind}")
 
 
-def _format_document_symbols(symbols: list[dict], indent: int = 0) -> list[str]:
+def _format_document_symbols(symbols: list[dict[str, Any]], indent: int = 0) -> list[str]:
     """Format document symbols recursively."""
     lines = []
     prefix = "  " * indent
@@ -695,7 +700,7 @@ class DiagnosticsHTTPHandler(BaseHTTPRequestHandler):
             logger.exception("HTTP diagnostics error")
             self._send_json(500, {"error": str(e)})
 
-    def _send_json(self, status: int, data: dict) -> None:
+    def _send_json(self, status: int, data: dict[str, Any]) -> None:
         """Send a JSON response."""
         body = json.dumps(data).encode("utf-8")
         self.send_response(status)

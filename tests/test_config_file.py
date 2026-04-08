@@ -3,8 +3,7 @@
 import json
 import os
 import tempfile
-
-import pytest
+from typing import Any
 
 from intelephense_watcher.config.config_file import get_ignore_patterns, load_config_file
 from intelephense_watcher.diagnostics import filter_by_ignore_patterns
@@ -98,7 +97,7 @@ class TestGetIgnorePatterns:
 
     def test_returns_empty_list_for_empty_ignore_array(self) -> None:
         """Test that empty ignore array returns empty list."""
-        config = {"ignore": []}
+        config: dict[str, Any] = {"ignore": []}
         result = get_ignore_patterns(config)
         assert result == []
 

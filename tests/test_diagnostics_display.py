@@ -1,7 +1,5 @@
 """Tests for diagnostics display utilities."""
 
-import pytest
-
 from intelephense_watcher.config.constants import CONSTANTS
 from intelephense_watcher.diagnostics import (
     _is_unused_underscore_variable,

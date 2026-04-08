@@ -23,7 +23,11 @@ def load_config_file(workspace_path: str) -> dict[str, Any] | None:
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            loaded = json.load(f)
+            if isinstance(loaded, dict):
+                return loaded
+            logger.warning(f"Expected JSON object in {config_path}, got {type(loaded).__name__}")
+            return None
     except json.JSONDecodeError as e:
         logger.warning(f"Invalid JSON in {config_path}: {e}")
         return None

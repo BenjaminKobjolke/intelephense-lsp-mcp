@@ -131,7 +131,10 @@ class LspClient:
             # Read content
             content_length = int(headers["Content-Length"])
             content = self.process.stdout.read(content_length).decode("utf-8")
-            return json.loads(content)
+            message = json.loads(content)
+            if isinstance(message, dict):
+                return message
+            return None
         except (json.JSONDecodeError, ValueError, OSError):
             return None
 
@@ -205,11 +208,12 @@ class LspClient:
         }
 
         result = self.send_request("initialize", init_params)
-        if result is None:
+        if not isinstance(result, dict):
             return False
 
         # Store server capabilities
-        self.server_capabilities = result.get("capabilities", {})
+        capabilities = result.get("capabilities", {})
+        self.server_capabilities = capabilities if isinstance(capabilities, dict) else {}
 
         # Send initialized notification
         self.send_notification("initialized", {})

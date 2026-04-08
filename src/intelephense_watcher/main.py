@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+from typing import Any
 
 from watchdog.observers import Observer
 
@@ -31,7 +32,7 @@ def _symbol_kind_name(kind: int) -> str:
     return kinds.get(kind, f"Kind{kind}")
 
 
-def _print_symbols(symbols: list, indent: int = 0) -> None:
+def _print_symbols(symbols: list[dict[str, Any]], indent: int = 0) -> None:
     """Print document symbols recursively."""
     prefix = "  " * indent
     for sym in symbols:
@@ -53,6 +54,12 @@ def _print_symbols(symbols: list, indent: int = 0) -> None:
         # Handle children (DocumentSymbol format)
         if "children" in sym:
             _print_symbols(sym["children"], indent + 1)
+
+
+def _csv_has_rows(output: str) -> bool:
+    """Return True when CSV output contains at least one data row."""
+    newline_count = output.count("\n")
+    return newline_count > 1 or (newline_count == 1 and not output.endswith("\n"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -136,7 +143,10 @@ def parse_args() -> argparse.Namespace:
         "--format",
         choices=["text", "csv"],
         default="text",
-        help="Output format when using --output (default: text, auto-detects csv from .csv extension)",
+        help=(
+            "Output format when using --output "
+            "(default: text, auto-detects csv from .csv extension)"
+        ),
     )
     return parser.parse_args()
 
@@ -245,9 +255,13 @@ def main() -> None:
 
         time.sleep(CONSTANTS.DIAGNOSTICS_DELAY)  # Wait for indexing
 
-        result = lsp_client.go_to_definition(abs_file, int(line), int(col))
-        if result:
-            locations = result if isinstance(result, list) else [result]
+        definition_result = lsp_client.go_to_definition(abs_file, int(line), int(col))
+        if definition_result:
+            locations = (
+                definition_result
+                if isinstance(definition_result, list)
+                else [definition_result]
+            )
             for loc in locations:
                 path = uri_to_path(loc["uri"])
                 start = loc["range"]["start"]
@@ -269,9 +283,9 @@ def main() -> None:
 
         time.sleep(CONSTANTS.DIAGNOSTICS_DELAY)  # Wait for indexing
 
-        result = lsp_client.get_hover(abs_file, int(line), int(col))
-        if result:
-            contents = result.get("contents", {})
+        hover_result = lsp_client.get_hover(abs_file, int(line), int(col))
+        if hover_result:
+            contents = hover_result.get("contents", {})
             if isinstance(contents, dict):
                 print(contents.get("value", str(contents)))
             elif isinstance(contents, list):
@@ -357,8 +371,7 @@ def main() -> None:
             }
             if _should_use_csv(args):
                 output = display.format_csv(filtered_diagnostics)
-                # CSV has header line, so check if there's more than just the header
-                has_output = output.count("\n") > 1 or (output.count("\n") == 1 and not output.endswith("\n"))
+                has_output = _csv_has_rows(output)
             else:
                 output = display.format_plain(filtered_diagnostics)
                 has_output = bool(output.strip())
@@ -406,8 +419,7 @@ def main() -> None:
             diagnostics_dict = dict(lsp_client.diagnostics)
             if _should_use_csv(args):
                 output = display.format_csv(diagnostics_dict)
-                # CSV has header line, so check if there's more than just the header
-                has_output = output.count("\n") > 1 or (output.count("\n") == 1 and not output.endswith("\n"))
+                has_output = _csv_has_rows(output)
             else:
                 output = display.format_plain(diagnostics_dict)
                 has_output = bool(output.strip())

@@ -2,8 +2,6 @@
 
 import os
 
-import pytest
-
 from intelephense_watcher.lsp_client import path_to_uri, uri_to_path
 
 
