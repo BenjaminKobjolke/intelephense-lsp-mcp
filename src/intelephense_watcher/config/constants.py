@@ -27,7 +27,7 @@ class Constants:
     PHP_EXTENSIONS: tuple[str, ...] = (".php",)
 
     # Directories to skip during scanning
-    SKIP_DIRECTORIES: tuple[str, ...] = ("vendor", "node_modules", ".git", "cache")
+    SKIP_DIRECTORIES: tuple[str, ...] = ("vendor", "node_modules", ".git", "cache", ".phpstan-cache")
 
     # Timing values (in seconds)
     DEBOUNCE_DELAY: float = 0.3
