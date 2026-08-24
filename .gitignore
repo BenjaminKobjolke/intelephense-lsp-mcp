@@ -4,3 +4,5 @@ errors.txt
 mcp.log
 __pycache__
 .claude
+claude-plans
+tmp/commit_msg.tmp
