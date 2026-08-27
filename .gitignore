@@ -3,6 +3,10 @@
 errors.txt
 mcp.log
 __pycache__
-.claude
+.claude/
 claude-plans
 tmp/commit_msg.tmp
+graphify-out/
+src/graphify-out/
+coding-rules.json
+/PLAN_*.md
